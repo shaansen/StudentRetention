@@ -8,7 +8,7 @@ var parseTime = d3.timeParse("%Y%m%d");
 
 var x = d3.scaleTime().range([0, width]),
     y = d3.scaleLinear().range([height, 0]),
-    z = d3.scaleOrdinal(d3.schemeCategory10);
+    z = d3.scaleOrdinal(d3.schemeCategory20);
 
 var line = d3.line()
     .curve(d3.curveBasis)
@@ -17,11 +17,12 @@ var line = d3.line()
 
 let studentData;
 //d3.csv("data/actualdata.csv", type, function(error, data) {
-d3.csv("data/grades.csv", type, function(error, data1) {
+d3.csv("data/grades1.csv", type, function(error, csvData) {
   if (error) throw error;
 
-  var data = transformCSVToUsefulStuff(data1)
+  var data = transformCSVToUsefulStuff(csvData)
 
+  
   var students = Object.keys(data[0]).slice(3).map(function(id) {    return {
       id: id,
       values: data.map(function(d) {
@@ -95,26 +96,24 @@ var sort_by = function(field, reverse, primer){
 
 function transformCSVToUsefulStuff(d) {
   let keys = []
+  var columnsInData = d.columns.slice(3);
+  columnsInData.sort();
 
   // To split the keys in the CSV to Date and Events
-  for (k in d[0]) {
-    if (d[0].hasOwnProperty(k)) {
-      if(k.indexOf("-")!==-1) {
-        var x = k.split("-")
-        var y = {}
-        y["date"] = new Date(x[0].slice(0,4),x[0].slice(4,6)-1,x[0].slice(6,8))
-        y["dateInt"] = x[0]
-        y["event"] = x[1]
-        keys.push(y);  
-      }
-    }
+  for (k in columnsInData) {
+    var x = columnsInData[k].split("-")
+    var y = {}
+    y["date"] = new Date(x[0].slice(0,4),x[0].slice(4,6)-1,x[0].slice(6,8))
+    y["dateInt"] = x[0]
+    y["event"] = x[1]
+    keys.push(y);  
   }
-
+ 
   // To get cummulative scores and calculate the maximum of every test
   var total = []
   var max = Array.apply(null, Array(keys.length)).map(Number.prototype.valueOf,0);
   for(var i=0;i<d.length;i++) {
-    var x = (d[i]["Username"]+"-"+d[i]["SecNo"])
+    var x = (d[i]["Username"]+"-"+d[i]["Sec No"])
     total[i] = 0;
     for(var j=0;j<keys.length;j++) {
       var y = (keys[j]["dateInt"]+"-"+keys[j]["event"])
@@ -125,9 +124,10 @@ function transformCSVToUsefulStuff(d) {
     }  
   }
 
+
   // To calculate the normalized scores of all the candidates
   for(var i=0;i<d.length;i++) {
-    var x = (d[i]["Username"]+"-"+d[i]["SecNo"])
+    var x = (d[i]["Username"]+"-"+d[i]["Sec No"])
     for(var j=0;j<keys.length;j++) {
       var y = (keys[j]["dateInt"]+"-"+keys[j]["event"])
         keys[j][x] = (d[i][y]/max[j])*100
