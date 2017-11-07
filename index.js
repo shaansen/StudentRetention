@@ -4,6 +4,8 @@ var svg = d3.select("svg"),
     height = svg.attr("height") - margin.top - margin.bottom,
     g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
+var columnsInData
+
 var parseTime = d3.timeParse("%Y%m%d");
 
 var x = d3.scaleTime().range([0, width]),
@@ -20,9 +22,13 @@ let studentData;
 d3.csv("data/grades1.csv", type, function(error, csvData) {
   if (error) throw error;
 
-  var data = transformCSVToUsefulStuff(csvData)
+  columnsInData = csvData.columns.slice(3);
+  columnsInData.sort();
 
-  
+  var noOfKs = 10
+  var maxIterations = 100000
+  var clusteredData = getDataAfterClustering(csvData,noOfKs,maxIterations)
+  var data = transformCSVToUsefulStuff(clusteredData)
   var students = Object.keys(data[0]).slice(3).map(function(id) {    return {
       id: id,
       values: data.map(function(d) {
@@ -96,9 +102,6 @@ var sort_by = function(field, reverse, primer){
 
 function transformCSVToUsefulStuff(d) {
   let keys = []
-  var columnsInData = d.columns.slice(3);
-  columnsInData.sort();
-
   // To split the keys in the CSV to Date and Events
   for (k in columnsInData) {
     var x = columnsInData[k].split("-")
@@ -137,4 +140,118 @@ function transformCSVToUsefulStuff(d) {
   // Sorting the keys objects on the basis of dates
   keys.sort(function(a,b) {return a.date-b.date} )
   return keys
+}
+
+
+// Function that calls the k-means algorithm
+function getDataAfterClustering(data,noOfKs,maxIterations) {
+  var centroids = kmeans(data,noOfKs,maxIterations)
+  return centroids
+}
+
+// K-Means driver function
+function kmeans(dataset,k,maxIterations) {
+  var numFeatures = dataset.columns.slice(3)
+  var centroids = getRandomCentroids(numFeatures,k)
+  var iterations = 0
+  var oldCentroids
+  
+  while(!shouldStop(oldCentroids,centroids,iterations,maxIterations)) {
+    oldCentroids = centroids
+    iterations = iterations + 1
+    var labels = getLabels(dataset,centroids)
+    centroids = getCentroids(dataset,labels,k,numFeatures)
+  }
+  return centroids
+}
+
+// Should-Stop terminates the iterations
+function shouldStop(oldCentroids,centroids,iterations,maxIterations) {
+  if(iterations == maxIterations) {
+    return true
+  }
+  return oldCentroids == centroids
+}
+
+// Returns k random centroids
+function getCentroids(dataset,labels,k,numFeatures) {
+
+  var newCentroids = []
+
+  for (var i = 0; i < k; i++) {
+    if(labels[i].length==0) {
+      newCentroids[i] = randomReInitialize(numFeatures)
+
+    } else {
+      newCentroids[i] = computeGeometricCentroids(dataset,labels[i],numFeatures)
+    }
+    newCentroids[i]["Username"] = i
+    newCentroids[i]["Sec No"] = 1
+
+  }
+  return newCentroids;
+}
+
+function computeGeometricCentroids(d,l,numFeatures) {
+  var result = {}
+
+  for(var i = 0;i < numFeatures.length;i++) {
+    var total = 1
+    for (var j = 0; j < l.length; j++) {
+      total = total + d[l[j]][numFeatures[i]]
+    }  
+    result[numFeatures[i]] = Math.floor(total/l.length) 
+  }
+  return result
+}
+
+// Returns a label for each piece of data in the dataset.
+function getLabels(dataset, centroids) {
+  var labelData = []
+
+  for(var j = 0; j < centroids.length; j++) {
+    labelData[j] = []
+  }
+
+  for (var i = 0; i < dataset.length; i++) {
+    var min_element = 1000;
+    var min_index   = 1000;
+    for(var j = 0; j < centroids.length; j++) {
+      var distance = getDistance(dataset[i],centroids[j])
+      if(distance < min_element) {
+        min_element = distance
+        min_index   = j
+      }
+    }
+     
+    labelData[min_index].push(i);
+  }
+  return labelData
+}
+
+function getDistance(d,c) {
+  var total = 0
+  
+  for (var i = 0; i < columnsInData.length; i++) {
+    total = total + (c[columnsInData[i]]-d[columnsInData[i]])*(c[columnsInData[i]]-d[columnsInData[i]])
+  }
+  
+  return Math.sqrt(total/columnsInData.length)
+}
+
+function getRandomCentroids(numFeatures,k) {
+  var x = [];
+  for(var i=0;i<k;i++) {
+    x[i] = randomReInitialize(numFeatures)    
+  }
+  return x
+}
+
+function randomReInitialize(numFeatures) {
+  var x = {}
+  for(var j=0;j<numFeatures.length;j++) {
+    var y = Math.floor((Math.random() * 100) + 1)
+    x[numFeatures[j]] = y
+  }
+  return x 
 }
